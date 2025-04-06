@@ -19,16 +19,28 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
       return;
     }
 
-    // Update user's survey information
+    // Check if user exists and create if not
     const { location, sunlightHours, availableSpace } = req.body;
-    await User.findOneAndUpdate(
-      { firebaseUid: firebaseUser.uid },
-      {
+    let user = await User.findOne({ firebaseUid: firebaseUser.uid });
+
+    if (!user) {
+      // Create new user
+      user = new User({
+        firebaseUid: firebaseUser.uid,
+        email: firebaseUser.email,
         location,
         sunlightHours,
-        availableSpace
-      }
-    );
+        availableSpace,
+        plants: []
+      });
+      await user.save();
+    } else {
+      // Update existing user's survey information
+      user.location = location;
+      user.sunlightHours = sunlightHours;
+      user.availableSpace = availableSpace;
+      await user.save();
+    }
 
     // Initialize Gemini AI
     const genAI = new GoogleGenAI({ apiKey });
@@ -306,6 +318,52 @@ export const markStepAsCompleted = async (req: AuthRequest, res: Response): Prom
     console.error('Error marking step as completed:', error);
     res.status(500).json({ 
       message: 'Error marking step as completed',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+export const getPlantDetail = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const firebaseUser = req.user;
+    console.log(firebaseUser, id);
+
+    if (!firebaseUser) {
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
+    }
+
+    if (!id) {
+      res.status(400).json({ message: 'Plant ID is required' });
+      return;
+    }
+
+    // Check if user owns this plant
+    const user = await User.findOne({ 
+      firebaseUid: firebaseUser.uid,
+      plants: new Types.ObjectId(id)
+    });
+
+    if (!user) {
+      res.status(403).json({ message: 'Not authorized to view this plant' });
+      return;
+    }
+
+    const plant = await Plant.findById(id);
+    if (!plant) {
+      res.status(404).json({ message: 'Plant not found' });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Plant details retrieved successfully',
+      data: plant
+    });
+  } catch (error) {
+    console.error('Error retrieving plant details:', error);
+    res.status(500).json({ 
+      message: 'Error retrieving plant details',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
