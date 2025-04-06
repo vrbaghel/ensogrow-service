@@ -1,6 +1,7 @@
 import { Schema, model, Document } from 'mongoose';
 
 interface IStep {
+  id: number;
   title: string;
   description: string;
   estimatedTime: string;
@@ -17,11 +18,13 @@ export interface IPlantRecommendation extends Document {
   steps: IStep[];
   difficultyLevel: string;
   isValid: boolean;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const stepSchema = new Schema({
+  id: { type: Number, required: true },
   title: { type: String, required: true },
   description: { type: String, required: true },
   estimatedTime: { type: String, required: true },
@@ -41,7 +44,8 @@ const plantRecommendationSchema = new Schema({
   successRate: { type: String, required: true },
   steps: [stepSchema],
   difficultyLevel: { type: String, required: true },
-  isValid: { type: Boolean, default: true }
+  isValid: { type: Boolean, default: true },
+  isActive: { type: Boolean, default: false }
 }, {
   timestamps: true
 });

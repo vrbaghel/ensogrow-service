@@ -118,7 +118,8 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
         }
 
         // Process steps
-        const processedSteps = rec.steps.map((step: any) => ({
+        const processedSteps = rec.steps.map((step: any, index: number) => ({
+          id: index + 1,
           title: String(step.title || '').trim(),
           description: String(step.description || '').trim(),
           estimatedTime: String(step.estimatedTime || '').trim(),
@@ -185,6 +186,63 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
 
     res.status(500).json({ 
       message: 'Error generating plant recommendations',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+export const togglePlantActiveStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Validate ID
+    if (!id) {
+      res.status(400).json({
+        message: 'Plant recommendation ID is required'
+      });
+      return;
+    }
+
+    // Find and update the plant recommendation
+    const plantRecommendation = await PlantRecommendation.findByIdAndUpdate(
+      id,
+      { isActive: true },
+      { new: true }
+    );
+
+    if (!plantRecommendation) {
+      res.status(404).json({
+        message: 'Plant recommendation not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Plant recommendation activated successfully',
+      data: plantRecommendation
+    });
+  } catch (error) {
+    console.error('Error toggling plant active status:', error);
+    res.status(500).json({
+      message: 'Error toggling plant active status',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+export const getActivePlantRecommendations = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Find all active plant recommendations
+    const activePlants = await PlantRecommendation.find({ isActive: true });
+
+    res.status(200).json({
+      message: 'Active plant recommendations retrieved successfully',
+      data: activePlants
+    });
+  } catch (error) {
+    console.error('Error fetching active plant recommendations:', error);
+    res.status(500).json({
+      message: 'Error fetching active plant recommendations',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }

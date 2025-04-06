@@ -131,7 +131,8 @@ export const getCustomPlantRecommendation = async (req: Request, res: Response):
     }
 
     // Process steps
-    const processedSteps = parsedRecommendation.steps.map((step: any) => ({
+    const processedSteps = parsedRecommendation.steps.map((step: any, index: number) => ({
+      id: index + 1,
       title: String(step.title || '').trim(),
       description: String(step.description || '').trim(),
       estimatedTime: String(step.estimatedTime || '').trim(),
