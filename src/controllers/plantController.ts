@@ -1,9 +1,11 @@
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
 import Plant from '../models/Plant';
+import User from '../models/User';
 import { GoogleGenAI } from '@google/genai';
-import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 
-
-export const getPlantRecommendations = async (req: Request, res: Response): Promise<void> => {
+export const getPlantRecommendations = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Validate API key
     const apiKey = process.env.GEMINI_API_KEY;
@@ -11,18 +13,25 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
       throw new Error('GEMINI_API_KEY is not set in environment variables');
     }
 
-    // Initialize Gemini AI
-    const genAI = new GoogleGenAI({ apiKey });
-
-    const { location, sunlightHours, availableSpace } = req.body;
-
-    // Validate input
-    if (!location || !sunlightHours || !availableSpace) {
-      res.status(400).json({ 
-        message: 'Missing required fields: location, sunlightHours, availableSpace' 
-      });
+    const firebaseUser = req.user;
+    if (!firebaseUser) {
+      res.status(401).json({ message: 'User not authenticated' });
       return;
     }
+
+    // Update user's survey information
+    const { location, sunlightHours, availableSpace } = req.body;
+    await User.findOneAndUpdate(
+      { firebaseUid: firebaseUser.uid },
+      {
+        location,
+        sunlightHours,
+        availableSpace
+      }
+    );
+
+    // Initialize Gemini AI
+    const genAI = new GoogleGenAI({ apiKey });
 
     // Create prompt for Gemini AI
     const prompt = `Given the following conditions:
@@ -57,12 +66,7 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
         ],
         "difficultyLevel": "Difficulty level"
       }
-    ]
-    
-    Each step should be a complete instruction that can be tracked independently.
-    Do not include any markdown formatting, code blocks, or additional text. Return ONLY the JSON array.`;
-
-    console.log('Sending prompt to Gemini:', prompt);
+    ]`;
 
     // Get model and generate content
     const response = await genAI.models.generateContent({
@@ -74,34 +78,25 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
       throw new Error('No response text from Gemini API');
     }
 
-    console.log('Raw Gemini response:', response.text);
-
     // Try to parse the response
     let parsedRecommendations;
     try {
-      // First, try to find a JSON array in the response
       const jsonMatch = response.text.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         throw new Error('No JSON array found in response');
       }
 
-      // Clean the JSON string
       const jsonStr = jsonMatch[0]
         .replace(/```json\n?/g, '')
         .replace(/```\n?/g, '')
         .trim();
 
-      console.log('Extracted JSON string:', jsonStr);
-
-      // Parse the JSON
       parsedRecommendations = JSON.parse(jsonStr);
 
-      // Validate the structure
       if (!Array.isArray(parsedRecommendations)) {
         throw new Error('Parsed data is not an array');
       }
 
-      // Validate each recommendation
       parsedRecommendations.forEach((rec: any) => {
         if (!rec.name || !rec.description || !rec.successRate || !rec.steps || !rec.difficultyLevel) {
           throw new Error('Missing required fields in recommendation');
@@ -110,7 +105,6 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
 
     } catch (parseError) {
       console.error('Error parsing Gemini response:', parseError);
-      console.error('Raw response:', response.text);
       throw new Error(`Failed to parse Gemini response: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
     }
 
@@ -128,9 +122,6 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
 
         // Create and save the plant
         const plant = new Plant({
-          location,
-          sunlightHours: Number(sunlightHours),
-          availableSpace,
           plantName: String(rec.name).trim(),
           description: String(rec.description).trim(),
           successRate: String(rec.successRate).trim(),
@@ -140,6 +131,13 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
         });
 
         await plant.save();
+
+        // Add plant to user's plants array
+        await User.findOneAndUpdate(
+          { firebaseUid: firebaseUser.uid },
+          { $push: { plants: plant._id } }
+        );
+
         return plant;
       })
     );
@@ -151,7 +149,6 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
   } catch (error) {
     console.error('Error creating plants:', error);
     
-    // Handle specific error cases
     if (error instanceof Error) {
       if (error.message.includes('403')) {
         res.status(403).json({ 
@@ -183,12 +180,29 @@ export const getPlantRecommendations = async (req: Request, res: Response): Prom
   }
 };
 
-export const togglePlantActiveStatus = async (req: Request, res: Response): Promise<void> => {
+export const togglePlantActiveStatus = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const firebaseUser = req.user;
+
+    if (!firebaseUser) {
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
+    }
 
     if (!id) {
       res.status(400).json({ message: 'Plant ID is required' });
+      return;
+    }
+
+    // Check if user owns this plant
+    const user = await User.findOne({ 
+      firebaseUid: firebaseUser.uid,
+      plants: new Types.ObjectId(id)
+    });
+
+    if (!user) {
+      res.status(403).json({ message: 'Not authorized to modify this plant' });
       return;
     }
 
@@ -198,7 +212,6 @@ export const togglePlantActiveStatus = async (req: Request, res: Response): Prom
       return;
     }
 
-    // Toggle the isActive status
     plant.isActive = !plant.isActive;
     await plant.save();
 
@@ -215,13 +228,24 @@ export const togglePlantActiveStatus = async (req: Request, res: Response): Prom
   }
 };
 
-export const getActivePlantRecommendations = async (req: Request, res: Response): Promise<void> => {
+export const getActivePlantRecommendations = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const activePlants = await Plant.find({ isActive: true });
-    
+    const firebaseUser = req.user;
+
+    if (!firebaseUser) {
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
+    }
+
+    // Get user's active plants
+    const user = await User.findOne({ firebaseUid: firebaseUser.uid }).populate({
+      path: 'plants',
+      match: { isActive: true }
+    });
+
     res.status(200).json({
       message: 'Active plants retrieved successfully',
-      data: activePlants
+      data: user?.plants || []
     });
   } catch (error) {
     console.error('Error retrieving active plants:', error);
@@ -232,12 +256,29 @@ export const getActivePlantRecommendations = async (req: Request, res: Response)
   }
 };
 
-export const markStepAsCompleted = async (req: Request, res: Response): Promise<void> => {
+export const markStepAsCompleted = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { plantId, stepId } = req.params;
+    const firebaseUser = req.user;
+
+    if (!firebaseUser) {
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
+    }
 
     if (!plantId || !stepId) {
       res.status(400).json({ message: 'Plant ID and Step ID are required' });
+      return;
+    }
+
+    // Check if user owns this plant
+    const user = await User.findOne({ 
+      firebaseUid: firebaseUser.uid,
+      plants: new Types.ObjectId(plantId)
+    });
+
+    if (!user) {
+      res.status(403).json({ message: 'Not authorized to modify this plant' });
       return;
     }
 
@@ -247,20 +288,19 @@ export const markStepAsCompleted = async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Find the step and update its status
-    const stepIndex = plant.steps.findIndex(step => step.id === Number(stepId));
-    if (stepIndex === -1) {
+    // Find and update the step
+    const step = plant.steps.find(s => s.id === Number(stepId));
+    if (!step) {
       res.status(404).json({ message: 'Step not found' });
       return;
     }
 
-    // Update the step's isCompleted status
-    plant.steps[stepIndex].isCompleted = true;
+    step.isCompleted = true;
     await plant.save();
 
     res.status(200).json({
-      message: 'Step marked as completed successfully',
-      data: plant.steps[stepIndex]
+      message: 'Step marked as completed',
+      data: plant
     });
   } catch (error) {
     console.error('Error marking step as completed:', error);

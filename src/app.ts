@@ -30,6 +30,7 @@ app.get('/', (req: Request, res: Response) => {
 
 // Protected routes
 app.use('/api', authenticateUser);
+app.use('/api/plants', plantRoutes);
 
 // Example protected route
 app.get('/api/protected', (req: AuthRequest, res: Response) => {
@@ -38,9 +39,6 @@ app.get('/api/protected', (req: AuthRequest, res: Response) => {
     user: req.user // This will contain the Firebase user data
   });
 });
-
-// API routes
-app.use('/api/plants', plantRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

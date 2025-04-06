@@ -1,9 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
 export interface IPlant extends Document {
-  location: string;
-  sunlightHours: number;
-  availableSpace: string;
   plantName: string;
   description: string;
   successRate: string;
@@ -22,18 +19,6 @@ export interface IPlant extends Document {
 }
 
 const plantSchema = new Schema({
-  location: {
-    type: String,
-    required: true
-  },
-  sunlightHours: {
-    type: Number,
-    required: true
-  },
-  availableSpace: {
-    type: String,
-    required: true
-  },
   plantName: {
     type: String,
     required: true
