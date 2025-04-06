@@ -121,7 +121,7 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
         }
         // Validate image URL
         try {
-          new URL(rec.imageUrl);
+          new URL("https://picsum.photos/500/500");
         } catch {
           throw new Error('Invalid image URL provided');
         }
@@ -149,7 +149,7 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
           plantName: String(rec.name).trim(),
           description: String(rec.description).trim(),
           successRate: String(rec.successRate).trim(),
-          imageUrl: String(rec.imageUrl).trim(),
+          imageUrl: "https://picsum.photos/500/500",
           steps: processedSteps,
           difficultyLevel: String(rec.difficultyLevel).trim(),
           isValid: true
