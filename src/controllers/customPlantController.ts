@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { Request, Response } from 'express';
-import PlantRecommendation from '../models/PlantRecommendation';
+import Plant from '../models/Plant';
 
 export const getCustomPlantRecommendation = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -139,8 +139,8 @@ export const getCustomPlantRecommendation = async (req: Request, res: Response):
       isCompleted: false
     }));
 
-    // Create and save the recommendation
-    const plantRecommendation = new PlantRecommendation({
+    // Create and save the plant
+    const plant = new Plant({
       location,
       sunlightHours: Number(sunlightHours),
       availableSpace,
@@ -152,14 +152,14 @@ export const getCustomPlantRecommendation = async (req: Request, res: Response):
       isValid: parsedRecommendation.isValid
     });
 
-    await plantRecommendation.save();
+    await plant.save();
 
     res.status(200).json({
-      message: 'Custom plant recommendation generated successfully',
-      data: plantRecommendation
+      message: 'Custom plant created successfully',
+      data: plant
     });
   } catch (error) {
-    console.error('Error generating custom plant recommendation:', error);
+    console.error('Error creating custom plant:', error);
     
     // Handle specific error cases
     if (error instanceof Error) {
@@ -187,7 +187,7 @@ export const getCustomPlantRecommendation = async (req: Request, res: Response):
     }
 
     res.status(500).json({ 
-      message: 'Error generating custom plant recommendation',
+      message: 'Error creating custom plant',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
