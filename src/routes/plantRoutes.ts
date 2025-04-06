@@ -1,32 +1,29 @@
-import { Router } from 'express';
+import express from 'express';
 import { authenticateUser } from '../middleware/auth';
-import { 
-  getPlantRecommendations, 
-  togglePlantActiveStatus, 
+import {
+  getPlantRecommendations,
+  togglePlantActiveStatus,
   getActivePlantRecommendations,
   markStepAsCompleted,
-  getPlantDetail
+  getPlantDetail,
+  analyzePlantImage
 } from '../controllers/plantController';
-import { getCustomPlantRecommendation } from '../controllers/customPlantController';
 
-const router = Router();
+const router = express.Router();
 
-// Get plant recommendations
+// Apply authentication middleware to all routes
+router.use(authenticateUser);
+
+// Plant image analysis route (must come before /:id)
+router.post('/:plantId/diagnose', analyzePlantImage);
+
+// Plant recommendation routes
 router.post('/recommendations', getPlantRecommendations);
-
-// Get custom plant recommendation
-router.post('/custom', getCustomPlantRecommendation);
-
-// Get active plants (must come before /:id)
+router.post('/custom', getPlantRecommendations);
+// Plant management routes
 router.get('/active', getActivePlantRecommendations);
-
-// Get plant details
 router.get('/:id', getPlantDetail);
-
-// Toggle plant active status
 router.patch('/:id/activate', togglePlantActiveStatus);
-
-// Mark step as completed
 router.patch('/:plantId/steps/:stepId/complete', markStepAsCompleted);
 
 export default router; 
