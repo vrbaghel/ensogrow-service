@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
 import connectDB from './config/database';
-import { authenticateUser } from './middleware/auth';
+import { authenticateUser, AuthRequest } from './middleware/auth';
 import plantRoutes from './routes/plantRoutes';
 
 // Load environment variables first
@@ -32,15 +32,15 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api', authenticateUser);
 
 // Example protected route
-app.get('/api/protected', (req: Request, res: Response) => {
+app.get('/api/protected', (req: AuthRequest, res: Response) => {
   res.json({ 
     message: 'This is a protected route',
-    userId: req.auth.userId 
+    user: req.user // This will contain the Firebase user data
   });
 });
 
 // API routes
-app.use('/plants', plantRoutes);
+app.use('/api/plants', plantRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

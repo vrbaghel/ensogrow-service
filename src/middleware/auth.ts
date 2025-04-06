@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import admin from '../config/firebase';
 
 // Extend Express Request type to include auth
 declare global {
@@ -12,17 +13,32 @@ declare global {
   }
 }
 
-// Authentication middleware
-export const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-// console.log(req?.auth?.userId);
-try {
-    const { userId } = req.auth;
-    if (!userId) {
-        res.status(401).json({ message: 'Authentication failed' });
-    }
-    next();
-} catch (error) {
-    console.error('Authentication error:', error);
-    res.status(401).json({ message: 'Authentication failed' });
+export interface AuthRequest extends Request {
+  user?: admin.auth.DecodedIdToken;
 }
+
+// Authentication middleware for protected routes
+export const authenticateUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Unauthorized - No token provided' });
+      return;
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('Error verifying Firebase token:', error);
+    res.status(401).json({ error: 'Unauthorized - Invalid token' });
+    return;
+  }
 };
