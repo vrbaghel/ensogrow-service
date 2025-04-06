@@ -4,6 +4,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
 import connectDB from './config/database';
 import { authenticateUser } from './middleware/auth';
+import plantRecommendationRoutes from './routes/plantRecommendationRoutes';
 
 // Load environment variables first
 dotenv.config();
@@ -37,6 +38,9 @@ app.get('/api/protected', (req: Request, res: Response) => {
     userId: req.auth.userId 
   });
 });
+
+// API routes
+app.use('/plants', plantRecommendationRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
