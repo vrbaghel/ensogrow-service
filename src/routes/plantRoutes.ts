@@ -11,7 +11,7 @@ import { getCustomPlantRecommendation } from '../controllers/customPlantControll
 const router = Router();
 
 // Get plant recommendations
-router.post('/', getPlantRecommendations);
+router.post('/recommendations', getPlantRecommendations);
 
 // Toggle plant active status
 router.patch('/:id/activate', togglePlantActiveStatus);
