@@ -61,6 +61,7 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
        - Growth milestones
        - Harvesting instructions (if applicable)
     4. Growing difficulty level
+    5. A publicly accessible image URL of the plant (must be a real, working URL from reliable sources like Unsplash, Pexels, or other reputable stock photo sites)
     
     IMPORTANT: Return ONLY a valid JSON array of objects with these exact properties:
     [
@@ -68,6 +69,7 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
         "name": "Plant name",
         "description": "Brief description",
         "successRate": "success rate in percentage",
+        "imageUrl": "https://example.com/plant-image.jpg",
         "steps": [
           {
             "title": "Step title",
@@ -110,8 +112,14 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
       }
 
       parsedRecommendations.forEach((rec: any) => {
-        if (!rec.name || !rec.description || !rec.successRate || !rec.steps || !rec.difficultyLevel) {
+        if (!rec.name || !rec.description || !rec.successRate || !rec.steps || !rec.difficultyLevel || !rec.imageUrl) {
           throw new Error('Missing required fields in recommendation');
+        }
+        // Validate image URL
+        try {
+          new URL(rec.imageUrl);
+        } catch {
+          throw new Error('Invalid image URL provided');
         }
       });
 
@@ -137,6 +145,7 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
           plantName: String(rec.name).trim(),
           description: String(rec.description).trim(),
           successRate: String(rec.successRate).trim(),
+          imageUrl: String(rec.imageUrl).trim(),
           steps: processedSteps,
           difficultyLevel: String(rec.difficultyLevel).trim(),
           isValid: true

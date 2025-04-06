@@ -4,6 +4,7 @@ export interface IPlant extends Document {
   plantName: string;
   description: string;
   successRate: string;
+  imageUrl: string;
   steps: Array<{
     id: number;
     title: string;
@@ -28,6 +29,10 @@ const plantSchema = new Schema({
     required: true
   },
   successRate: {
+    type: String,
+    required: true
+  },
+  imageUrl: {
     type: String,
     required: true
   },
