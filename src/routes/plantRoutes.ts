@@ -8,6 +8,7 @@ import {
   getPlantDetail,
   analyzePlantImage
 } from '../controllers/plantController';
+import { getCustomPlantRecommendation } from '@/controllers/customPlantController';
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.post('/:plantId/diagnose', analyzePlantImage);
 
 // Plant recommendation routes
 router.post('/recommendations', getPlantRecommendations);
-router.post('/custom', getPlantRecommendations);
+router.post('/custom', getCustomPlantRecommendation);
 // Plant management routes
 router.get('/active', getActivePlantRecommendations);
 router.get('/:id', getPlantDetail);
