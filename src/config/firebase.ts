@@ -1,24 +1,21 @@
-import * as admin from 'firebase-admin';
-import dotenv from 'dotenv';
+import * as admin from "firebase-admin";
+import dotenv from "dotenv";
 
-// Load environment variables first
 dotenv.config();
 
-// Initialize Firebase Admin with credentials
-// You should have your service account JSON file in a secure location
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  : undefined;
+const base64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
 
-if (!serviceAccount) {
-  throw new Error('Firebase service account is not configured');
+if (!base64) {
+  throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_B64");
 }
 
-// Initialize Firebase Admin
+const jsonString = Buffer.from(base64, "base64").toString("utf-8");
+const serviceAccount = JSON.parse(jsonString);
+
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
 }
 
-export default admin; 
+export default admin;

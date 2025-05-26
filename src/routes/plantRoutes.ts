@@ -8,7 +8,7 @@ import {
   getPlantDetail,
   analyzePlantImage
 } from '../controllers/plantController';
-import { getCustomPlantRecommendation } from '@/controllers/customPlantController';
+import { getCustomPlantRecommendation } from "../controllers/customPlantController";
 
 const router = express.Router();
 
