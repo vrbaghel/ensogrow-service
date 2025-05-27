@@ -150,7 +150,7 @@ export const getCustomPlantRecommendation = async (req: Request, res: Response):
       successRate: String(parsedRecommendation.successRate).trim(),
       steps: processedSteps,
       difficultyLevel: String(parsedRecommendation.difficultyLevel).trim(),
-      isValid: parsedRecommendation.isValid
+      isValid: parsedRecommendation.isValid,
       imageUrl: String(parsedRecommendation.imageUrl).trim(),
     });
 
