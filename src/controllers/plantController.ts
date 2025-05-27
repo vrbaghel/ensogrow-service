@@ -1,25 +1,28 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
-import Plant from '../models/Plant';
-import User from '../models/User';
-import { GoogleGenAI } from '@google/genai';
-import { Types } from 'mongoose';
+import { Response } from "express";
+import { AuthRequest } from "../middleware/auth";
+import Plant from "../models/Plant";
+import User from "../models/User";
+import { GoogleGenAI } from "@google/genai";
+import { Types } from "mongoose";
 
-export const getPlantRecommendations = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getPlantRecommendations = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
     const firebaseUser = req.user;
     const { location, sunlightHours, availableSpace } = req.body;
 
     if (!firebaseUser) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: "User not authenticated" });
       return;
     }
 
     // Validate required fields
     if (!location || !sunlightHours || !availableSpace) {
-      res.status(400).json({ 
-        message: 'Missing required fields',
-        required: ['location', 'sunlightHours', 'availableSpace']
+      res.status(400).json({
+        message: "Missing required fields",
+        required: ["location", "sunlightHours", "availableSpace"],
       });
       return;
     }
@@ -35,7 +38,7 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
         location,
         sunlightHours,
         availableSpace,
-        plants: []
+        plants: [],
       });
       await user.save();
     } else {
@@ -89,11 +92,11 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
     // Get model and generate content
     const response = await genAI.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
     if (!response.text) {
-      throw new Error('No response text from Gemini API');
+      throw new Error("No response text from Gemini API");
     }
 
     // Try to parse the response
@@ -101,35 +104,47 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
     try {
       const jsonMatch = response.text.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
-        throw new Error('No JSON array found in response');
+        throw new Error("No JSON array found in response");
       }
 
       const jsonStr = jsonMatch[0]
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
         .trim();
 
       parsedRecommendations = JSON.parse(jsonStr);
 
       if (!Array.isArray(parsedRecommendations)) {
-        throw new Error('Parsed data is not an array');
+        throw new Error("Parsed data is not an array");
       }
 
       parsedRecommendations.forEach((rec: any) => {
-        if (!rec.name || !rec.description || !rec.successRate || !rec.steps || !rec.difficultyLevel || !rec.imageUrl) {
-          throw new Error('Missing required fields in recommendation');
+        if (
+          !rec.name ||
+          !rec.description ||
+          !rec.successRate ||
+          !rec.steps ||
+          !rec.difficultyLevel ||
+          !rec.imageUrl
+        ) {
+          throw new Error("Missing required fields in recommendation");
         }
         // Validate image URL
         try {
           new URL("https://picsum.photos/500/500");
         } catch {
-          throw new Error('Invalid image URL provided');
+          throw new Error("Invalid image URL provided");
         }
       });
-
     } catch (parseError) {
-      console.error('Error parsing Gemini response:', parseError);
-      throw new Error(`Failed to parse Gemini response: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
+      console.error("Error parsing Gemini response:", parseError);
+      throw new Error(
+        `Failed to parse Gemini response: ${
+          parseError instanceof Error
+            ? parseError.message
+            : "Unknown parsing error"
+        }`
+      );
     }
 
     // Process and save each recommendation
@@ -138,10 +153,10 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
         // Process steps
         const processedSteps = rec.steps.map((step: any, index: number) => ({
           id: index + 1,
-          title: String(step.title || '').trim(),
-          description: String(step.description || '').trim(),
-          estimatedTime: String(step.estimatedTime || '').trim(),
-          isCompleted: false
+          title: String(step.title || "").trim(),
+          description: String(step.description || "").trim(),
+          estimatedTime: String(step.estimatedTime || "").trim(),
+          isCompleted: false,
         }));
 
         // Create and save the plant
@@ -152,7 +167,7 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
           imageUrl: "https://picsum.photos/500/500",
           steps: processedSteps,
           difficultyLevel: String(rec.difficultyLevel).trim(),
-          isValid: true
+          isValid: true,
         });
 
         await plant.save();
@@ -168,155 +183,181 @@ export const getPlantRecommendations = async (req: AuthRequest, res: Response): 
     );
 
     res.status(200).json({
-      message: 'Plants created successfully',
-      data: savedPlants
+      message: "Plants created successfully",
+      data: savedPlants,
     });
   } catch (error) {
-    console.error('Error creating plants:', error);
-    
+    console.error("Error creating plants:", error);
+
     if (error instanceof Error) {
-      if (error.message.includes('403')) {
-        res.status(403).json({ 
-          message: 'Authentication failed. Please check your Gemini API key.',
-          error: error.message
+      if (error.message.includes("403")) {
+        res.status(403).json({
+          message: "Authentication failed. Please check your Gemini API key.",
+          error: error.message,
         });
         return;
       }
-      if (error.message.includes('API key')) {
-        res.status(401).json({ 
-          message: 'Invalid API key. Please check your Gemini API key configuration.',
-          error: error.message
+      if (error.message.includes("API key")) {
+        res.status(401).json({
+          message:
+            "Invalid API key. Please check your Gemini API key configuration.",
+          error: error.message,
         });
         return;
       }
-      if (error.message.includes('parse')) {
-        res.status(422).json({ 
-          message: 'Failed to parse Gemini response. The response format was invalid.',
-          error: error.message
+      if (error.message.includes("parse")) {
+        res.status(422).json({
+          message:
+            "Failed to parse Gemini response. The response format was invalid.",
+          error: error.message,
         });
         return;
       }
     }
 
-    res.status(500).json({ 
-      message: 'Error creating plants',
-      error: error instanceof Error ? error.message : 'Unknown error'
+    res.status(500).json({
+      message: "Error creating plants",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
-export const togglePlantActiveStatus = async (req: AuthRequest, res: Response): Promise<void> => {
+export const togglePlantActiveStatus = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
     const firebaseUser = req.user;
 
     if (!firebaseUser) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: "User not authenticated" });
       return;
     }
 
     if (!id) {
-      res.status(400).json({ message: 'Plant ID is required' });
+      res.status(400).json({ message: "Plant ID is required" });
       return;
     }
 
-    // Check if user owns this plant
-    const user = await User.findOne({ 
-      firebaseUid: firebaseUser.uid,
-      plants: new Types.ObjectId(id)
-    });
+    // ✅ Step 1: Find user by firebase UID
+    const user = await User.findOne({ firebaseUid: firebaseUser.uid });
 
     if (!user) {
-      res.status(403).json({ message: 'Not authorized to modify this plant' });
+      res.status(404).json({ message: "User not found" });
       return;
     }
 
+    // ✅ Step 2: Find the plant
     const plant = await Plant.findById(id);
     if (!plant) {
-      res.status(404).json({ message: 'Plant not found' });
+      res.status(404).json({ message: "Plant not found" });
       return;
     }
 
+    // ✅ Step 3: Add plant to user if not already owned
+    const plantObjectId = new Types.ObjectId(id);
+    const alreadyOwned = user.plants.some(
+      (p) => p.toString() === plantObjectId.toString()
+    );
+
+    if (!alreadyOwned) {
+      (user.plants as Types.ObjectId[]).push(plantObjectId);
+      await user.save();
+    }
+
+    // ✅ Step 4: Toggle plant active status
     plant.isActive = !plant.isActive;
     await plant.save();
 
     res.status(200).json({
-      message: `Plant ${plant.isActive ? 'activated' : 'deactivated'} successfully`,
-      data: plant
+      message: `Plant ${
+        plant.isActive ? "activated" : "deactivated"
+      } successfully`,
+      data: plant,
     });
   } catch (error) {
-    console.error('Error toggling plant active status:', error);
-    res.status(500).json({ 
-      message: 'Error toggling plant active status',
-      error: error instanceof Error ? error.message : 'Unknown error'
+    console.error("Error toggling plant active status:", error);
+    res.status(500).json({
+      message: "Error toggling plant active status",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
-export const getActivePlantRecommendations = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getActivePlantRecommendations = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
+    console.log({ req: req.user });
     const firebaseUser = req.user;
 
     if (!firebaseUser) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: "User not authenticated" });
       return;
     }
 
     // Get user's active plants
-    const user = await User.findOne({ firebaseUid: firebaseUser.uid }).populate({
-      path: 'plants',
-      match: { isActive: true }
-    });
+    const user = await User.findOne({ firebaseUid: firebaseUser.uid }).populate(
+      {
+        path: "plants",
+        match: { isActive: true },
+      }
+    );
 
     res.status(200).json({
-      message: 'Active plants retrieved successfully',
-      data: user?.plants || []
+      message: "Active plants retrieved successfully",
+      data: user?.plants || [],
     });
   } catch (error) {
-    console.error('Error retrieving active plants:', error);
-    res.status(500).json({ 
-      message: 'Error retrieving active plants',
-      error: error instanceof Error ? error.message : 'Unknown error'
+    console.error("Error retrieving active plants:", error);
+    res.status(500).json({
+      message: "Error retrieving active plants",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
-export const markStepAsCompleted = async (req: AuthRequest, res: Response): Promise<void> => {
+export const markStepAsCompleted = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
     const { plantId, stepId } = req.params;
     const firebaseUser = req.user;
 
     if (!firebaseUser) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: "User not authenticated" });
       return;
     }
 
     if (!plantId || !stepId) {
-      res.status(400).json({ message: 'Plant ID and Step ID are required' });
+      res.status(400).json({ message: "Plant ID and Step ID are required" });
       return;
     }
 
     // Check if user owns this plant
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       firebaseUid: firebaseUser.uid,
-      plants: new Types.ObjectId(plantId)
+      plants: new Types.ObjectId(plantId),
     });
 
     if (!user) {
-      res.status(403).json({ message: 'Not authorized to modify this plant' });
+      res.status(403).json({ message: "Not authorized to modify this plant" });
       return;
     }
 
     const plant = await Plant.findById(plantId);
     if (!plant) {
-      res.status(404).json({ message: 'Plant not found' });
+      res.status(404).json({ message: "Plant not found" });
       return;
     }
 
     // Find and update the step
-    const step = plant.steps.find(s => s.id === Number(stepId));
+    const step = plant.steps.find((s) => s.id === Number(stepId));
     if (!step) {
-      res.status(404).json({ message: 'Step not found' });
+      res.status(404).json({ message: "Step not found" });
       return;
     }
 
@@ -324,38 +365,41 @@ export const markStepAsCompleted = async (req: AuthRequest, res: Response): Prom
     await plant.save();
 
     res.status(200).json({
-      message: 'Step marked as completed',
-      data: plant
+      message: "Step marked as completed",
+      data: plant,
     });
   } catch (error) {
-    console.error('Error marking step as completed:', error);
-    res.status(500).json({ 
-      message: 'Error marking step as completed',
-      error: error instanceof Error ? error.message : 'Unknown error'
+    console.error("Error marking step as completed:", error);
+    res.status(500).json({
+      message: "Error marking step as completed",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
-export const getPlantDetail = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getPlantDetail = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
     const firebaseUser = req.user;
 
     if (!firebaseUser) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: "User not authenticated" });
       return;
     }
 
     if (!id) {
-      res.status(400).json({ message: 'Plant ID is required' });
+      res.status(400).json({ message: "Plant ID is required" });
       return;
     }
 
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(id)) {
-      res.status(400).json({ 
-        message: 'Invalid plant ID format',
-        error: 'ID must be a 24-character hex string'
+      res.status(400).json({
+        message: "Invalid plant ID format",
+        error: "ID must be a 24-character hex string",
       });
       return;
     }
@@ -363,61 +407,64 @@ export const getPlantDetail = async (req: AuthRequest, res: Response): Promise<v
     const plantId = new Types.ObjectId(id);
 
     // Check if user owns this plant
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       firebaseUid: firebaseUser.uid,
-      plants: plantId
+      plants: plantId,
     });
 
     if (!user) {
-      res.status(403).json({ message: 'Not authorized to view this plant' });
+      res.status(403).json({ message: "Not authorized to view this plant" });
       return;
     }
 
     const plant = await Plant.findById(plantId);
     if (!plant) {
-      res.status(404).json({ message: 'Plant not found' });
+      res.status(404).json({ message: "Plant not found" });
       return;
     }
 
     res.status(200).json({
-      message: 'Plant details retrieved successfully',
-      data: plant
+      message: "Plant details retrieved successfully",
+      data: plant,
     });
   } catch (error) {
-    console.error('Error retrieving plant details:', error);
-    res.status(500).json({ 
-      message: 'Error retrieving plant details',
-      error: error instanceof Error ? error.message : 'Unknown error'
+    console.error("Error retrieving plant details:", error);
+    res.status(500).json({
+      message: "Error retrieving plant details",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
-export const analyzePlantImage = async (req: AuthRequest, res: Response): Promise<void> => {
+export const analyzePlantImage = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
     const { plantId } = req.params;
     const { imageBase64 } = req.body;
     const firebaseUser = req.user;
 
     if (!firebaseUser) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: "User not authenticated" });
       return;
     }
 
     if (!plantId) {
-      res.status(400).json({ message: 'Plant ID is required' });
+      res.status(400).json({ message: "Plant ID is required" });
       return;
     }
 
     if (!imageBase64) {
-      res.status(400).json({ message: 'Image data is required' });
+      res.status(400).json({ message: "Image data is required" });
       return;
     }
 
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(plantId)) {
-      res.status(400).json({ 
-        message: 'Invalid plant ID format',
-        error: 'ID must be a 24-character hex string'
+      res.status(400).json({
+        message: "Invalid plant ID format",
+        error: "ID must be a 24-character hex string",
       });
       return;
     }
@@ -425,29 +472,29 @@ export const analyzePlantImage = async (req: AuthRequest, res: Response): Promis
     const plantObjectId = new Types.ObjectId(plantId);
 
     // Check if user owns this plant
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       firebaseUid: firebaseUser.uid,
-      plants: plantObjectId
+      plants: plantObjectId,
     });
 
     if (!user) {
-      res.status(403).json({ message: 'Not authorized to analyze this plant' });
+      res.status(403).json({ message: "Not authorized to analyze this plant" });
       return;
     }
 
     const plant = await Plant.findById(plantObjectId);
     if (!plant) {
-      res.status(404).json({ message: 'Plant not found' });
+      res.status(404).json({ message: "Plant not found" });
       return;
     }
 
     // Trim data URL prefix if present
-    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
     // Validate API key
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set in environment variables');
+      throw new Error("GEMINI_API_KEY is not set in environment variables");
     }
 
     // Initialize Gemini AI
@@ -481,62 +528,81 @@ export const analyzePlantImage = async (req: AuthRequest, res: Response): Promis
       model: "gemini-2.0-flash",
       contents: [
         { role: "user", parts: [{ text: prompt }] },
-        { role: "user", parts: [{ inlineData: { data: cleanBase64, mimeType: "image/jpeg" } }] }
-      ]
+        {
+          role: "user",
+          parts: [
+            { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } },
+          ],
+        },
+      ],
     });
 
     if (!response.text) {
-      console.error('Gemini API Response:', response);
-      throw new Error('No response text from Gemini API');
+      console.error("Gemini API Response:", response);
+      throw new Error("No response text from Gemini API");
     }
 
     const text = response.text;
-    console.log('Gemini Raw Response:', text);
+    console.log("Gemini Raw Response:", text);
 
     // Parse the response
     let analysis;
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        console.error('No JSON found in response. Full response:', text);
-        throw new Error('No JSON object found in response');
+        console.error("No JSON found in response. Full response:", text);
+        throw new Error("No JSON object found in response");
       }
 
       const jsonStr = jsonMatch[0]
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
         .trim();
 
       analysis = JSON.parse(jsonStr);
 
       // Validate required fields
-      if (!analysis.healthCondition || !analysis.issues || !analysis.recommendations || 
-          !analysis.growthStage) {
-        console.error('Missing required fields in analysis:', analysis);
-        throw new Error('Missing required fields in analysis');
+      if (
+        !analysis.healthCondition ||
+        !analysis.issues ||
+        !analysis.recommendations ||
+        !analysis.growthStage
+      ) {
+        console.error("Missing required fields in analysis:", analysis);
+        throw new Error("Missing required fields in analysis");
       }
 
       // If treatment is needed, validate treatment steps
-      if (analysis.needsTreatment && (!analysis.treatmentSteps || !Array.isArray(analysis.treatmentSteps))) {
-        throw new Error('Treatment steps are required when needsTreatment is true');
+      if (
+        analysis.needsTreatment &&
+        (!analysis.treatmentSteps || !Array.isArray(analysis.treatmentSteps))
+      ) {
+        throw new Error(
+          "Treatment steps are required when needsTreatment is true"
+        );
       }
-
     } catch (parseError) {
-      console.error('Error parsing Gemini response:', parseError);
-      console.error('Raw response that failed to parse:', text);
-      throw new Error(`Failed to parse Gemini response: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
+      console.error("Error parsing Gemini response:", parseError);
+      console.error("Raw response that failed to parse:", text);
+      throw new Error(
+        `Failed to parse Gemini response: ${
+          parseError instanceof Error
+            ? parseError.message
+            : "Unknown parsing error"
+        }`
+      );
     }
 
     // If plant is healthy, return early with success message
     if (!analysis.needsTreatment) {
       res.status(200).json({
-        message: 'Plant is healthy! No additional steps needed.',
+        message: "Plant is healthy! No additional steps needed.",
         data: {
           healthCondition: analysis.healthCondition,
           issues: [],
           recommendations: analysis.recommendations,
-          growthStage: analysis.growthStage
-        }
+          growthStage: analysis.growthStage,
+        },
       });
       return;
     }
@@ -545,73 +611,79 @@ export const analyzePlantImage = async (req: AuthRequest, res: Response): Promis
     const lastCompletedStep = plant.steps
       .slice()
       .reverse()
-      .find(step => step.isCompleted);
+      .find((step) => step.isCompleted);
 
     // Add new treatment steps after the last completed step
-    const newSteps = analysis.treatmentSteps.map((step: { title: string; description: string; estimatedTime: string }, index: number) => ({
-      id: plant.steps.length + index + 1,
-      title: step.title,
-      description: step.description,
-      estimatedTime: step.estimatedTime,
-      isCompleted: false
-    }));
+    const newSteps = analysis.treatmentSteps.map(
+      (
+        step: { title: string; description: string; estimatedTime: string },
+        index: number
+      ) => ({
+        id: plant.steps.length + index + 1,
+        title: step.title,
+        description: step.description,
+        estimatedTime: step.estimatedTime,
+        isCompleted: false,
+      })
+    );
 
     // Update plant steps
     plant.steps = [
       ...plant.steps.slice(0, lastCompletedStep ? lastCompletedStep.id : 0),
-      ...newSteps
+      ...newSteps,
     ];
 
     await plant.save();
 
     res.status(200).json({
-      message: 'Plant analysis completed and steps updated',
+      message: "Plant analysis completed and steps updated",
       data: {
         healthCondition: analysis.healthCondition,
         issues: analysis.issues,
         recommendations: analysis.recommendations,
         growthStage: analysis.growthStage,
-        updatedSteps: newSteps
-      }
+        updatedSteps: newSteps,
+      },
     });
-
   } catch (error) {
-    console.error('Error analyzing plant image:', error);
-    
+    console.error("Error analyzing plant image:", error);
+
     if (error instanceof Error) {
-      if (error.message.includes('403')) {
-        res.status(403).json({ 
-          message: 'Authentication failed. Please check your Gemini API key.',
-          error: error.message
+      if (error.message.includes("403")) {
+        res.status(403).json({
+          message: "Authentication failed. Please check your Gemini API key.",
+          error: error.message,
         });
         return;
       }
-      if (error.message.includes('API key')) {
-        res.status(401).json({ 
-          message: 'Invalid API key. Please check your Gemini API key configuration.',
-          error: error.message
+      if (error.message.includes("API key")) {
+        res.status(401).json({
+          message:
+            "Invalid API key. Please check your Gemini API key configuration.",
+          error: error.message,
         });
         return;
       }
-      if (error.message.includes('parse')) {
-        res.status(422).json({ 
-          message: 'Failed to parse Gemini response. The response format was invalid.',
-          error: error.message
+      if (error.message.includes("parse")) {
+        res.status(422).json({
+          message:
+            "Failed to parse Gemini response. The response format was invalid.",
+          error: error.message,
         });
         return;
       }
-      if (error.message.includes('No response text')) {
-        res.status(500).json({ 
-          message: 'Gemini API returned no text response',
-          error: error.message
+      if (error.message.includes("No response text")) {
+        res.status(500).json({
+          message: "Gemini API returned no text response",
+          error: error.message,
         });
         return;
       }
     }
 
-    res.status(500).json({ 
-      message: 'Error analyzing plant image',
-      error: error instanceof Error ? error.message : 'Unknown error'
+    res.status(500).json({
+      message: "Error analyzing plant image",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
-}; 
+};
