@@ -57,6 +57,7 @@ export const getCustomPlantRecommendation = async (req: Request, res: Response):
           "isCompleted": false
         }
       ],
+      "imageUrl": "A valid image URL representing the plant"
       "difficultyLevel": "Difficulty level"
     }
     
@@ -150,6 +151,7 @@ export const getCustomPlantRecommendation = async (req: Request, res: Response):
       steps: processedSteps,
       difficultyLevel: String(parsedRecommendation.difficultyLevel).trim(),
       isValid: parsedRecommendation.isValid
+      imageUrl: String(parsedRecommendation.imageUrl).trim(),
     });
 
     await plant.save();
